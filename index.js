@@ -1,4 +1,4 @@
-import {getNoteFromRepository, getUserNotesFromRepository, writeUserNoteInRepository} from "./repository.js"
+import {getNoteFromRepository, getUserNotesFromRepository, writeUserNoteInRepository} from "repository.js"
 
 const repositoryResponseConverter = (repositoryResponse) => {
     return {
@@ -20,7 +20,17 @@ const DEFAULT_RESPONSE = {
 const handleGetNotes = async(userId) => {
     console.log(`handleGetNotes for userId [${userId}]`);
     
-    const response = getUserNotesFromRepository(userId);
+    let response = DEFAULT_RESPONSE;
+
+    await getUserNotesFromRepository(userId)
+        .then((data) => {
+            response = repositoryResponseConverter(data);
+            console.log(response);
+            return response;
+        })
+        .catch((err) => {
+            console.log(err);
+        });
 
     return repositoryResponseConverter(response);
 }
@@ -53,21 +63,31 @@ const handleGetNote = async(userId, noteId) => {
 const handleUpdateNote = async(userId, noteId, notesContent) => {
     console.log(`handleUpdateNote for userId=[${userId}] and noteId=[${noteId}] and content=[${notesContent}]`);
 
-    const response = writeUserNoteInRepository(userId, noteId, notesContent);
+    let response = DEFAULT_RESPONSE;
 
-    return repositoryResponseConverter(response);
+    response = await writeUserNoteInRepository(userId, noteId, notesContent).then(
+        (data) => {
+            response = repositoryResponseConverter(data);
+            console.log(response);
+            return response;
+        }
+    );
+
+    return response;
 };
 
 
 const parsePath = (pathUrl) => {
-    if (pathUrl[-1] === "/") {
-        pathUrl = pathUrl.slice(0, -1);
+    let modifiedPathUrl = pathUrl;
+    if (modifiedPathUrl.endsWith("/")) {
+      modifiedPathUrl = modifiedPathUrl.slice(0, -1);
     }
-    if (pathUrl[0] === "/") {
-        pathUrl = pathUrl.slice(1);
+    if (modifiedPathUrl.startsWith("/")) {
+      modifiedPathUrl = modifiedPathUrl.slice(1);
     }
-    return pathUrl.split("/");
-}
+    return modifiedPathUrl;
+  };
+  
 
 const isUserAuthenticated = (event) => {
     const userIdentity = event.requestContext.identity.user;
@@ -102,19 +122,16 @@ export const handler = async (event) => {
         }
     }
     
-
-    const httpMethod = event.httpMethod;
-    const urlPath = event.path;
+    const { httpMethod, path, body } = event;
     const normalizedHttpMethod = httpMethod.toLowerCase();
-    const tokens = parsePath(urlPath);
-    
+    const tokens = parsePath(path);
+
     if (normalizedHttpMethod === "get") {
         // GET: user/<userId>/notes
         if (tokens.length === 3 && tokens[0] === "users" && tokens[2] == "notes") {
             const userId = tokens[1];
             return await handleGetNotes(userId);
         }
-
         // GET: user/<userId>/notes/<noteId>
         if (tokens.length === 4 && tokens[0] === "users" && tokens[2] == "notes") {
             const userId = tokens[1];
@@ -126,7 +143,7 @@ export const handler = async (event) => {
         if (tokens.length === 4 && tokens[0] === "users" && tokens[2] == "notes") {
             const userId = tokens[1];
             const noteId = tokens[3];
-            return await handleUpdateNote(userId, noteId, event.body);
+            return await handleUpdateNote(userId, noteId, body);
         }
     }
 

@@ -25,16 +25,6 @@ class RepositoryResponse {
     }
 }
 
-const defaultErrorHandler = (err, data) => {
-    if (err) {
-        console.log("There was an error: ", err)
-        return new RepositoryResponse(err.statusCode, err.code, err.message);
-    } else {
-        console.log(data)
-        return new RepositoryResponse(200, data.Body, null);
-    }
-}
-
 
 export const getNoteFromRepository = async (userId, noteId) => {
   const notePath = `${userId}/${noteId}`;
@@ -95,6 +85,12 @@ export const writeUserNoteInRepository = async(userId, noteId, noteContent) => {
         Body: noteContent
     };
 
-    const s3Response = s3Client.putObject(params, defaultErrorHandler);
-    return new RepositoryResponse(200, s3Response.Body, null);
+    try {
+      const s3Response = await s3Client.putObject(params).promise();
+      console.log(s3Response);
+      return new RepositoryResponse(200, s3Response.Body, null);
+    } catch (error) {
+      console.error(error);
+      return new RepositoryResponse(500, null, error)
+    }
 }
